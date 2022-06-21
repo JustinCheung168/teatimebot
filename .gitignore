@@ -1,3 +1,4 @@
 .env
 *.png
 envDiscord
+.DS_Store

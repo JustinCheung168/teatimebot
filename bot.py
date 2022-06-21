@@ -138,11 +138,21 @@ async def on_message(message):
             ri = random.randrange(1000000,2000000)
             dfi.export(ttb.highscoreboard.display(arg),f"{ri}.png")
             await channel.send(file=discord.File(f"{ri}.png"))
+            os.remove(f"{ri}.png")
 
         elif len(arg) == 0:
             await channel.send("Please write the name of a Mudae game after $highscores! For example:\n$highscores blacktea")
         else:
             await channel.send("I don't know that game!")
+
+    if (message.content[0:9] == '$blacktea'):
+        arg = message.content[10:]
+        if arg == "scrabble":
+            ttb.activegames[channel.id] = "blackteascrabble"
+            await channel.send("I'll be tracking points for blacktea scrabble!")
+        else:
+            ttb.activegames[channel.id] = "blacktea"
+            await channel.send("I'll be tracking points for blacktea!")
 
 
 
@@ -179,7 +189,6 @@ async def on_message(message):
             if not isinstance(embedded.title, _EmptyEmbed):
                 if ("The Black Teaword will start!" in embedded.title):
                     ttb.scoreboards[channel.id] = {}
-                    ttb.activegames[channel.id] = "blacktea"
                     ttb.highscorers[channel.id] = set()
 
         if ((":coffee:" in message.content) and ("Type a word containing:" in message.content)): #given a prompt
@@ -198,8 +207,13 @@ async def on_message(message):
                 ttb.highscorers[channel.id].add(target_player)
 
         if ((":trophy::trophy::trophy:" in message.content) and ("won the game!" in message.content)):
-            for highscorer in ttb.highscorers[channel.id]:
-                await channel.send("⭐ HIGH SCORE! ⭐\n"+reverse_user_id_dict[highscorer]+": "+str(ttb.highscoreboard.get_score(ttb.activegames[channel.id],highscorer)))
+            final_results_msg = ":coffee:Final Results::coffee:\n"
+            for player in ttb.scoreboards[channel.id]:
+                final_results_msg += reverse_user_id_dict[player]+": "+str(ttb.scoreboards[channel.id][player])
+                if player in ttb.highscorers[channel.id]:
+                    final_results_msg += " ⭐ HIGH SCORE! ⭐"
+                final_results_msg += "\n"
+            await channel.send(final_results_msg)
             ttb.highscorers[channel.id]=set()
 
         if ("No participants..." in message.content):
