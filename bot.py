@@ -89,6 +89,8 @@ class HighscoreBoard(CachedObject):
             return False
 
     def get_score(self, game, player):
+
+        player = str(player)
         return self.local_object[game][player]
     
 ttb = TeaTimeBot()
