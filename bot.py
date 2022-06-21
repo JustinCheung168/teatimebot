@@ -72,6 +72,9 @@ class HighscoreBoard(CachedObject):
         return pd.DataFrame(game_hsb_dict,index=['High Score']).T.sort_values(by='High Score', ascending = False)
 
     def set_score(self, game, player, new_score):
+
+        player = str(player)
+
         if game not in self.local_object.keys():
             self.local_object[game] = {}
 
