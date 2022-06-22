@@ -110,12 +110,14 @@ class GameTracker():
         self.activegame = activegame
         self.highscoreboard = highscoreboard
         self.players = []
+        self.unanswered_players = [] #queue of players who have prompts that haven't yet gotten answers
         self.highscorers = set()
         self.prompts = {} #keys are str player ids, values are list of 3-letter prompts that the game has presented.
         self.words = {} #keys are str player ids, values are list of words that player used in this game; each list should be same size as corresponding list in prompts.
         self.word_msgs = {} #keys are str player ids, values are list of message_ids that correspond to the message that the words came from.
         self.points = {} #keys are str player ids, values are list of point values for each word; again, eahc list is same size as prompts and words.
         self.point_totals = {} #keys are str player ids, values are the total points so far (int).
+        
 
     def introduce_player(self, player):
         self.prompts[player] = []
@@ -130,17 +132,22 @@ class GameTracker():
             self.introduce_player(player)
         else:
             self.prompts[player].append(prompt)
+        self.unanswered_players.append(player)
 
     def give_answer(self, answer, message):
-        player = message.author
-        self.words[player].append(answer)
 
-        if message is not None:
-            self.word_msgs[player].append(message.id)
-        else:
+        if message is None:
+            player = self.unanswered_players[0]
             self.word_msgs[player].append(None)
+        else:
+            player = message.author.id
+            self.word_msgs[player].append(message.id)
 
+        self.unanswered_players.pop(0)
+
+        self.words[player].append(answer)
         self.points[player].append(0)
+
         this_answer_points, calculation_str = self.calculate_points(answer)
         add_points_notice_str = self.add_points(player, this_answer_points)
 
