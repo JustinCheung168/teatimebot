@@ -109,7 +109,6 @@ class GameTracker():
         self.channel = channel
         self.activegame = activegame
         self.highscoreboard = highscoreboard
-        self.currentplayer = None
         self.players = []
         self.highscorers = set()
         self.prompts = {} #keys are str player ids, values are list of 3-letter prompts that the game has presented.
@@ -118,8 +117,7 @@ class GameTracker():
         self.points = {} #keys are str player ids, values are list of point values for each word; again, eahc list is same size as prompts and words.
         self.point_totals = {} #keys are str player ids, values are the total points so far (int).
 
-    def introduce_player(self):
-        player = self.currentplayer
+    def introduce_player(self, player):
         self.prompts[player] = []
         self.words[player] = []
         self.word_msgs[player] = []
@@ -127,15 +125,14 @@ class GameTracker():
         self.point_totals[player] = 0
         self.players.append(player)
 
-    def add_prompt(self, prompt):
-        player = self.currentplayer 
+    def add_prompt(self, player, prompt):
         if player not in self.prompts.keys():
-            self.introduce_player()
+            self.introduce_player(player)
         else:
             self.prompts[player].append(prompt)
 
     def give_answer(self, answer, message):
-        player = self.currentplayer 
+        player = message.author
         self.words[player].append(answer)
 
         if message is not None:
@@ -348,6 +345,9 @@ async def on_message(message):
             else:
                 arg = ""
 
+            command = command.lower()
+            arg = arg.lower()
+
             commander_id = message.author.id
 
             #Unique teatimebot commands
@@ -512,8 +512,7 @@ _**TEA GAMES**_
 
         if ((":coffee:" in message.content) and ("Type a word containing: " in message.content)): #given a prompt
             prompt = message.content.split("Type a word containing: ",1)[1].replace("*","").lower()
-            ttb.gametrackers[chid].currentplayer = message.mentions[0].id
-            ttb.gametrackers[chid].add_prompt(prompt)
+            ttb.gametrackers[chid].add_prompt(message.mentions[0].id, prompt)
             
 
         if (":boom: Time's up:" in message.content): #question wrong
