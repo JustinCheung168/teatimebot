@@ -105,10 +105,14 @@ class GameTracker():
     """
     Tracks a single game in a given channel and keeps track of words used. Tallies points too.
     """
-    def __init__(self, channel, activegame, highscoreboard):
+    def __init__(self, channel, activegame, highscoreboard, pointlimit = None):
         self.channel = channel
         self.activegame = activegame
         self.highscoreboard = highscoreboard
+        self.pointlimit = pointlimit
+        self.round = 0
+        self.finalround = None
+        self.gameover = False
         self.players = []
         self.unanswered_players = [] #queue of players who have prompts that haven't yet gotten answers
         self.highscorers = set()
@@ -128,11 +132,22 @@ class GameTracker():
         self.players.append(player)
 
     def add_prompt(self, player, prompt):
+
         if player not in self.prompts.keys():
             self.introduce_player(player)
         else:
             self.prompts[player].append(prompt)
         self.unanswered_players.append(player)
+
+        if(player == self.players[0]): #if this is the first player, then a round has passed.
+            self.round += 1
+
+        if self.finalround is not None:
+            if (self.round == (self.finalround + 1)):
+                self.gameover = True
+
+    def fail_answer(self):
+        self.give_answer(None, None)
 
     def give_answer(self, answer, message):
 
@@ -154,37 +169,14 @@ class GameTracker():
         calculation_str += add_points_notice_str
         calculation_str += "\n"+str(id_to_user_dict[player])+" has "+str(self.point_totals[player])+" points!"
 
+        if self.pointlimit is not None:
+            if self.point_totals[player] >= self.pointlimit:
+                self.finalround = self.round
+
         if self.activegame == "blacktea custom":
             return ""
         else:
             return calculation_str
-
-    def add_points(self, player, points, msg_id = "END"):
-        if msg_id == "END":
-            self.points[player][-1] += points
-        else:
-            word_position = self.word_msgs[player].index(msg_id)
-            self.points[player][word_position] += points
-
-        self.point_totals[player] += points
-
-        add_points_notice_str = ""
-
-        if (self.activegame == "blacktea custom") and (msg_id != "END"):
-
-            add_points_notice_str += "Awarded **"+str(points)+" points** to **"+str(id_to_user_dict[player]+"** for "+str(self.words[player][word_position])+"!\n")
-            add_points_notice_str += str(id_to_user_dict[player])+" now has "+str(self.point_totals[player])+" points!"
-
-
-
-        if (self.point_totals[player] > self.highscoreboard.get_score(self.activegame,player)) and (player not in self.highscorers):
-            self.highscorers.add(player)
-            add_points_notice_str += "\n⭐ WOW! You've beaten your personal best score, "+str(id_to_user_dict[player])+"! ⭐"
-
-        return add_points_notice_str
-
-    def fail_answer(self):
-        self.give_answer(None, None)
 
     def calculate_points(self, word):
         if self.activegame == "blacktea":
@@ -217,6 +209,26 @@ class GameTracker():
         elif self.activegame == "blacktea custom":
             return 0, ""
 
+    def add_points(self, player, points, msg_id = "END"):
+        if msg_id == "END":
+            self.points[player][-1] += points
+        else:
+            word_position = self.word_msgs[player].index(msg_id)
+            self.points[player][word_position] += points
+
+        self.point_totals[player] += points
+
+        add_points_notice_str = ""
+
+        if (self.activegame == "blacktea custom") and (msg_id != "END"):
+            add_points_notice_str += "Awarded **"+str(points)+" points** to **"+str(id_to_user_dict[player]+"** for "+str(self.words[player][word_position])+"!\n")
+            add_points_notice_str += str(id_to_user_dict[player])+" now has "+str(self.point_totals[player])+" points!"
+
+        if (self.point_totals[player] > self.highscoreboard.get_score(self.activegame,player)) and (player not in self.highscorers):
+            self.highscorers.add(player)
+            add_points_notice_str += "\n⭐ WOW! You've beaten your personal best score, "+str(id_to_user_dict[player])+"! ⭐"
+
+        return add_points_notice_str
 
     def end_game(self):
 
@@ -246,11 +258,16 @@ class GameTracker():
             for highscorer in self.highscorers:
                 self.highscoreboard.set_score(self.activegame, highscorer, self.point_totals[highscorer])
             
-            #Save other results
+            #Save other results?
+
+            self.gameover = True
 
             return final_results_msg
 
         else:
+
+            self.gameover = True
+
             return "Never mind!"
 
 
@@ -347,13 +364,14 @@ async def on_message(message):
         if (message.content[0] == "$"): #Process a command
             command_pieces = message.content.split(" ",1)
             command = command_pieces[0]
+            command = command.lower()
             if len(command_pieces) > 1:
                 arg = command_pieces[1]
+                arg = arg.lower()
             else:
                 arg = ""
 
-            command = command.lower()
-            arg = arg.lower()
+            args = arg.split(" ")
 
             commander_id = message.author.id
 
@@ -394,7 +412,7 @@ _**TEA GAMES**_
 **$highscores**: Displays high scores for a given game!
     Usage: $highscores <name of game>
     Valid game names: blacktea, blacktea scrabble
-    Is the same as: $leaderboard, $hs, $lb 
+    Is the same as: $hs
                 """)
                 await channel.send("""
  ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -435,7 +453,7 @@ _**TEA GAMES**_
                 else:
                     await channel.send("Can't find that person!")
 
-            if (command == '$highscores') or (command == '$leaderboard') or (command == '$hs') or (command == '$lb'):
+            if (command == '$highscores') or (command == '$hs'):
                 if arg in ttb.hsb.local_object.keys():
                     ri = random.randrange(1000000,2000000)
                     dfi.export(ttb.hsb.disp(arg),f"{ri}.png")
@@ -452,13 +470,20 @@ _**TEA GAMES**_
             #Supplementing existing commands
 
             if (command == '$blacktea'):
-                if arg == "scrabble":
-                    ttb.gametrackers[chid] = GameTracker(channel, "blacktea scrabble", ttb.hsb)
+                if args[0] == "scrabble":
+                    if len(args) > 1:
+                        if args[1].isdigit():
+                            pointlimit = args[1]
+                        else:
+                            pointlimit = None
+                    ttb.gametrackers[chid] = GameTracker(channel, "blacktea scrabble", ttb.hsb, pointlimit=pointlimit)
                     await channel.send("I'll be tracking points for "+str(ttb.gametrackers[chid].activegame)+"!\nRemember, your goal is to write words that both fit the prompts and would have high scores in Scrabble!\nIf you would like to review the values of each letter in Scrabble, type: $scrabble")
-                elif arg == "long":
+                    if pointlimit is not None:
+                        await channel.send("First to reach **"+str(pointlimit)+"** points wins!")
+                elif args[0] == "long":
                     ttb.gametrackers[chid] = GameTracker(channel, "blacktea long", ttb.hsb)
                     await channel.send("I'll be tracking points for "+str(ttb.gametrackers[chid].activegame)+"!\nRemember, your goal is to write the longest possible words that fit the prompts!")
-                elif arg == "custom":
+                elif args[0] == "custom":
                     ttb.gametrackers[chid] = GameTracker(channel, "blacktea custom", ttb.hsb)
                     await channel.send("I'm starting a round of "+str(ttb.gametrackers[chid].activegame)+"!\nRemember, add points to players by replying to their Mudae-verified valid answers with: $ap <number of points to award>")
                 else:
@@ -520,7 +545,9 @@ _**TEA GAMES**_
         if ((":coffee:" in message.content) and ("Type a word containing: " in message.content)): #given a prompt
             prompt = message.content.split("Type a word containing: ",1)[1].replace("*","").lower()
             ttb.gametrackers[chid].add_prompt(message.mentions[0].id, prompt)
-            
+
+            if ttb.gametrackers[chid].gameover:
+                await terminate_gametracker(channel)
 
         if (":boom: Time's up:" in message.content): #question wrong
             ttb.gametrackers[chid].fail_answer()
@@ -531,12 +558,11 @@ _**TEA GAMES**_
         if ("No participants..." in message.content):
             await terminate_gametracker(channel, announce = False)
 
-        # # this is just here to remember how embeds work lol
-        # if (len(message.embeds) > 0):
-        #     embedded = message.embeds[0]
-        #     if not isinstance(embedded.title, _EmptyEmbed):
-        #         if ("The Black Teaword will start!" in embedded.title):
-        #             pass
+        if (len(message.embeds) > 0):
+            embedded = message.embeds[0]
+            if not isinstance(embedded.title, _EmptyEmbed):
+                if ("The Black Teaword will start!" in embedded.title):
+                    print('Game Starting!')
 
 
 
