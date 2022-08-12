@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import discord
 from discord.embeds import _EmptyEmbed
@@ -91,11 +92,14 @@ def display_point_dict(point_dict):
 
 
 
+# intents = discord.Intents.all()
+# client = discord.Client(intents=intents)
 client = discord.Client()
 
 class TeaTimeBot():
     def __init__(self):
-        self.gametrackers = {} #dict of dicts; keys are channels ids, second keys are users, values are scores
+        self.gametrackers = {} #dict; keys are channel ids, values are GameTracker instances
+        self.gameintromsgs = {} #dict; keys are channel ids, values are Discord message objects
         self.hsb = HighscoreBoard()
 
 
@@ -337,6 +341,7 @@ async def terminate_gametracker(channel, announce = True):
     if announce and (len(final_results_str) != 0):
         await channel.send(final_results_str)
     ttb.gametrackers.pop(channel.id, None)
+    ttb.gameintromsgs.pop(channel.id, None)
 
 
 @client.event
@@ -562,7 +567,7 @@ _**TEA GAMES**_
             embedded = message.embeds[0]
             if not isinstance(embedded.title, _EmptyEmbed):
                 if ("The Black Teaword will start!" in embedded.title):
-                    print('Game Starting!')
+                    ttb.gameintromsgs[channel] = message
 
 
 
